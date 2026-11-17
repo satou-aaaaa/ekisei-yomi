@@ -52,7 +52,7 @@
     };
   }
   // 言い方（「%」に pH の数が入る）× pH の数 → 問いの文
-  const sits = (phr, phs) => phr.flatMap((p) => phs.map((v) => p.replace("%", v.toFixed(1))));
+  const sits = (phr, phs) => phr.flatMap((p) => phs.map((v) => p.split("%").join(v.toFixed(1))));
   // 1つの種類（洗剤）を作る。grp・cat・key は液性の決まり RULE から。ph は問いに出す pH の数
   function K(id, lv, ans, name, look, why, phr, ph) {
     const r = RULE[ans];
