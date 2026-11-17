@@ -18,6 +18,7 @@ const check = (name, ok, detail = "") => results.push({ name, ok: !!ok, detail: 
 const G = createRequire(import.meta.url)(path.join(root, "data.js"));
 
 const PIN = "furo:10:2"; // 第1回の1問目（変わったら過去の日の問題が変わった印）
+const PINQ = "おふろの鏡をみがく住宅用洗浄剤（研磨材なし）。原液の pH は 5.0。　表示する液性は？|酸性/弱酸性/アルカリ性"; // 第1回の1問目の問いと選び肢（並びを入れかえても気づけるように。CodeRabbit ekisei-yomi#1）
 // ---- 1. 問題の作り方（ブラウザを使わない）----
 // 液性の表（ゲームとは別に書いた表。data.js の答え・どの側・強さがこれと合うかを見る）
 // 出典：消費者庁「雑貨工業品品質表示規程」二十七 合成洗剤・住宅用又は家具用の洗浄剤（2026-11-17 に読んだ）
@@ -88,7 +89,7 @@ const TB = {
   check("2か月のうちに15種類が全部出る・前の日と同じ組の日が少ない", cover.size === 15 && sameAsPrev < 20, `${cover.size}種類・前の日と同じ ${sameAsPrev}日`);
   // 過去の日の問題が変わらない（data.js を直したときの見張り。値は 2026-11-17 に作ったもの）
   const P0 = G.make(G.dailyTags("2026-11-17")[0]);
-  check("第1回（2026-11-17）の1問目が作ったときのまま（並べ替え・削除で過去の日の問題を変えない）", `${P0.kind}:${P0.v}` === PIN, `${P0.kind}:${P0.v}`);
+  check("第1回（2026-11-17）の1問目が作ったときのまま（並べ替え・削除で過去の日の問題を変えない）", `${P0.kind}:${P0.v}` === PIN && `${P0.q}|${P0.opts.join("/")}` === PINQ, `${P0.kind}:${P0.v} ${P0.q}`);
 }
 
 // ---- 2. ファイルの中身 ----
@@ -104,6 +105,8 @@ check("言い方：「必ず」「絶対」と言い切らない", !/必ず|絶�
 { const howto = (html.match(/<dialog id="howto"[\s\S]*?<\/dialog>/) || [""])[0], ab = (html.match(/function about\(\)[\s\S]*?\n}/) || [""])[0], dis = (t) => /教科書/.test(t) && /消費者庁/.test(t);
   check("言い方：遊び方・「このゲームについて」・README のどれにも、教科書や消費者庁のページで確かめることがある", dis(howto) && dis(ab) && dis(readme), `遊び方 ${dis(howto)}・について ${dis(ab)}`); }
 check("写し元（植物なかま分け・動物なかま分け・なに税？）の言葉が残っていない（game-dev.md A 手順5）", !/憲法|国会|内閣|裁判所|天皇|国事行為|しくみ帳|kenpo|kps|KPS|税|納め|財務省|e-Gov|zeikin|zni|ZNI|国税庁|動物|哺乳|魚類|呼吸|doubutsu|dnk|DNK|ズーネット|海遊館|植物|なかま|胚珠|維管束|子葉|shokubutsu|snk|SNK|大阪府/.test(html + gen + readme));
+{ const a11 = JSON.parse(readFileSync(path.join(root, "qa/a11y.json"), "utf8"));
+  check("見やすさの検査の画面の名前（qa/a11y.json）が、このゲームの画面にある名前（写し元の名前が残らない。CodeRabbit ekisei-yomi#1 の「雲帳」）", (a11.screens || []).every((x) => html.includes(x.name)), (a11.screens || []).map((x) => x.name).join(",")); }
 check("画面にお笑いの言葉を入れない（本物っぽく）", !/お笑い|ギャグ|ツッコミ|なんでやねん|（うそ）/.test(html + gen));
 check("引き継ぎ：transfer.js をゲームの script より前に、このゲームの記録のキー（記録・文字・復習）だけで読む・depth.js も前に読む", /<script src="transfer\.js" data-game="ekisei-yomi" data-keys="eky-v1,eky-fs,eky-depth"><\/script>\s*<script src="depth\.js" data-game="ekisei-yomi" data-key="eky-depth"><\/script>\s*<\/head>/.test(html) && html.indexOf('src="transfer.js"') < html.indexOf('src="data.js"') && /data-hk/.test(html) && existsSync(path.join(root, "transfer.js")));
 check("好きなだけ遊べる：チケット・回数の上限・🔒で開くモードを入れない（game-dev.md F1・F2）", !/🎫|チケット|すると開く|🔒/.test(html) && !/\blife\b|ELIFE/.test(html));
@@ -417,7 +420,7 @@ try {
     await solve(q); await q.click("#next"); await q.waitForTimeout(150);
     const after = await mem(q), dp2 = await q.evaluate(() => JSON.parse(localStorage.getItem("eky-depth")));
     check("復習を終えると結果は「復習」・今日の記録は増えない・シェアは出ない", (await q.textContent("h1")).includes("復習") && JSON.stringify(after.days) === JSON.stringify(before.days) && await q.locator("#share").count() === 0);
-    check("復習で一度で正解すると、次は3日後へ進む", Object.values(dp2.rv).every((x) => x.s === 1 && x.due > TODAY));
+    check("復習で一度で正解すると、次は3日後へ進む", Object.values(dp2.rv).every((x) => x.s === 1 && x.due === new Date(Date.parse(TODAY) + 3 * 864e5).toISOString().slice(0, 10)), JSON.stringify(dp2.rv));
     await q.goto(url); await q.waitForTimeout(150);
     check("復習を終えたら、ホームの「復習」は消える", await q.locator("#go-r").count() === 0);
     await q.evaluate(() => { const d = JSON.parse(localStorage.getItem("eky-depth")); d.rv["nai|1"] = { s: 0, due: "2026-01-01", t: 1 }; d.rv["constructor|x"] = { s: 0, due: "2026-01-01", t: 2 }; localStorage.setItem("eky-depth", JSON.stringify(d)); });
@@ -513,7 +516,7 @@ try {
   check("2段目「どの側？」：どの種類の問題も3つ（酸性の側・中性・アルカリ性の側）のどれかで、3つとも使う", bad.length === 0 && Object.keys(G.GROUPS).join() === "san,chu,alk" && used.size === 3, bad.join(",")); }
 // 引き継ぎコード（shared-workflows template/qa/transfer-check.mjs）
 try {
-  const sample = { "eky-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-13": { m: [0, 1, 0, 0, 2], k: ["e", "mitame", "halo", "kori", "kawa"] } }, hdays: {}, adays: {}, dex: { toire: 1, shokki: 1, sentaku: 1, mizuaka: 1, kankisen: 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "eky-fs": "3" };
+  const sample = { "eky-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-13": { m: [0, 1, 0, 0, 2], k: ["e", "mitame", "halo", "kori", "kawa"] } }, hdays: {}, adays: {}, dex: { toire: 1, shokki: 1, sentaku: 1, mizuaka: 1, kankisen: 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "eky-fs": "3", "eky-depth": JSON.stringify({ v: 1, rv: { "x|1": { s: 1, due: "2026-11-20", t: 1 } } }) }; // 復習の記録も引き継ぐ（CodeRabbit ekisei-yomi#1）
   await checkTransfer({ browser, url, game: "ekisei-yomi", sample, check, open: async (pg) => { if (await pg.locator("#howto[open]").count()) await pg.click("#howto-ok"); } });
 } catch (e) { check("引き継ぎの検査が最後まで動く", false, e.message.split("\n")[0]); }
 await browser.close();
